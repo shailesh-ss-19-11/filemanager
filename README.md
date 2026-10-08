@@ -9,14 +9,20 @@ file operations, free/used space, a clean-up tool, previews, and Android phone s
 
 | Platform | Download |
 |---|---|
-| **macOS (Apple silicon)** | [**File-Manager-arm64.dmg**](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-arm64.dmg) · [zip](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-arm64.zip) |
+| **macOS** (Apple silicon) | [**File-Manager-arm64.dmg**](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-arm64.dmg) · [zip](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-arm64.zip) |
+| **Windows** (64-bit) | [**File-Manager-Setup-x64.exe**](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-Setup-x64.exe) (installer) · [portable .exe](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-Portable-x64.exe) |
+| **Linux** (64-bit) | [**File-Manager-x86_64.AppImage**](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-x86_64.AppImage) · [.deb](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-amd64.deb) |
 | All versions | [Releases page](https://github.com/shailesh-ss-19-11/filemanager/releases) |
 
 **Install (macOS):** open the DMG and drag *File Manager* into *Applications*.
 The app is not signed yet, so the first time: right-click it → **Open** → **Open**
 (or run `xattr -dr com.apple.quarantine "/Applications/File Manager.app"`).
 
-**Phone over USB** needs libmtp once: `brew install libmtp`. Then plug the phone in, unlock it and choose *File transfer*.
+**Install (Windows):** run the installer. SmartScreen may warn because the app is not signed yet: *More info* → *Run anyway*.
+**Install (Linux):** `chmod +x File-Manager-x86_64.AppImage && ./File-Manager-x86_64.AppImage`, or `sudo apt install ./File-Manager-amd64.deb`.
+
+**Phone over USB** (macOS and Linux): install libmtp once (`brew install libmtp` / `sudo apt install libmtp9`), plug the phone in, unlock it and choose *File transfer*.
+On Windows, use *Connect to phone…* (FTP over Wi-Fi) — Windows Explorer already shows USB phones itself.
 
 ---
 
@@ -109,8 +115,12 @@ Downloads are served from GitHub Releases. To build the app and publish it:
 ```bash
 brew install libmtp      # once, so the phone helper can be built
 gh auth login            # once
-npm run release          # builds the .dmg/.zip and uploads them to release v<version>
+npm run release          # builds the .dmg/.zip on this Mac and uploads them to release v<version>
 ```
+
+Windows and Linux builds come from GitHub Actions (`.github/workflows/release.yml`): push a tag
+(`git tag v1.0.1 && git push --tags`) — or run the *Release* workflow by hand — and it builds the macOS, Windows
+and Linux files and attaches them to that release. The *CI* workflow runs the tests on all three systems for every push.
 
 Bump `version` in `package.json` first for a new release; running it again for the same version replaces the files.
 The files are named `File-Manager-arm64.dmg` / `.zip`, so the "latest" links above always work.
