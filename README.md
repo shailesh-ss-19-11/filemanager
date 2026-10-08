@@ -68,3 +68,16 @@ src/
 - Hidden files are dot-files on both platforms, plus well-known system entries (`$Recycle.Bin`, `desktop.ini`, …) on Windows. Windows' hidden file attribute is not read.
 - OS thumbnails (`nativeImage.createThumbnailFromPath`) are only available on macOS and Windows; other file kinds fall back to icons.
 - Installers are unsigned. Add code-signing configuration to the `build` section of `package.json` for distribution.
+
+## Phone, cleanup and file operations
+
+- **Phone over USB (macOS/Linux):** `brew install libmtp`, then `npm run build:mtp`. Plug the phone in, unlock it and choose *File transfer*; it appears under **Phone** in the sidebar.
+- **Phone over Wi-Fi (FTP):** start an FTP server app on the phone, then *Connect to phone…* and enter the IP and port it shows.
+- **Explorer-style actions:** compress / extract, hide / unhide, properties, open with, copy to / move to, new file, undo (⌘Z), drag & drop, Space preview, pinned folders.
+
+## Tests
+
+```
+npm test            # unit + engine tests (FTP server is started locally; phone tests skip without a phone)
+npm run test:e2e    # drives the real app with Playwright (phone UI test skips without a phone)
+```

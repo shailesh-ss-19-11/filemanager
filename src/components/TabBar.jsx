@@ -1,8 +1,9 @@
 import { Folder, Plus, X } from 'lucide-react';
-import { basename, isRootPath } from '../lib/fileUtils.js';
+import { basename, isRemotePath, isRootPath } from '../lib/fileUtils.js';
 
 export function tabTitle(path) {
   if (!path) return 'New tab';
+  if (isRemotePath(path)) return basename(path);
   if (isRootPath(path)) return path.replace(/[\\/]+$/, '') || '/';
   return basename(path);
 }

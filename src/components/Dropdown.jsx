@@ -51,9 +51,10 @@ export default function Dropdown({ icon, label, value, sections, title }) {
               {items.map((it) => (
                 <button
                   key={it.label}
-                  role="menuitemradio"
-                  aria-checked={!!it.checked}
+                  role={it.checked === undefined ? 'menuitem' : 'menuitemradio'}
+                  aria-checked={it.checked === undefined ? undefined : !!it.checked}
                   className="dd-item"
+                  disabled={it.disabled}
                   onClick={() => {
                     it.onSelect();
                     if (!it.keepOpen) setOpen(false);
@@ -61,6 +62,7 @@ export default function Dropdown({ icon, label, value, sections, title }) {
                 >
                   <span className="dd-check">{it.checked ? <Check size={14} /> : null}</span>
                   {it.label}
+                  {it.shortcut && <span className="dd-shortcut">{it.shortcut}</span>}
                 </button>
               ))}
             </div>

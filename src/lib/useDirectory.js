@@ -43,7 +43,7 @@ export function useDirectory(path, search) {
           truncated: !!res.truncated,
         });
       } else {
-        const res = await api.listDir(path);
+        const res = await api.listDir(path, reloadTick > 0);
         if (cancelled || req !== reqRef.current) return;
         if (res.ok) setState({ entries: res.entries, loading: false, error: null, truncated: false });
         else setState({ entries: [], loading: false, error: res.error, truncated: false });
@@ -57,6 +57,22 @@ export function useDirectory(path, search) {
       if (cancelRef.current) cancelRef.current();
     };
   }, [path, recursive, query, showHidden, reloadTick]);
+
+  // Phone / FTP folders can't be watched: poll while the window is focused and update only on change.
+  const entriesRef = useRef([]);
+  entriesRef.current = state.entries;
+  useEffect(() => {
+    if (!path || recursive || !/^(ftp|mtp):\/\//.test(path)) return undefined;
+    const sig = (list) => list.map((e) => `${e.name}|${e.size}|${e.mtime}`).sort().join('\n');
+    const t = setInterval(async () => {
+      if (!document.hasFocus()) return;
+      const res = await window.fsApi.listDir(path, true);
+      if (res.ok && sig(res.entries) !== sig(entriesRef.current)) {
+        setState((s) => ({ ...s, entries: res.entries }));
+      }
+    }, 8000);
+    return () => clearInterval(t);
+  }, [path, recursive]);
 
   // Live updates
   useEffect(() => {
@@ -72,5 +88,11 @@ export function useDirectory(path, search) {
     };
   }, [path, refresh]);
 
-  return { ...state, refresh };
+  // Hide entries right away (optimistic delete/move); the next refresh restores anything that failed.
+  const removeEntries = useCallback((paths) => {
+    const gone = new Set(paths);
+    setState((s) => ({ ...s, entries: s.entries.filter((e) => !gone.has(e.path)) }));
+  }, []);
+
+  return { ...state, refresh, removeEntries };
 }

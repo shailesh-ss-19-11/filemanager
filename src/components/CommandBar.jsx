@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
   Trash2,
   ExternalLink,
+  MoreHorizontal,
 } from 'lucide-react';
 import Dropdown from './Dropdown.jsx';
 import { GROUP_KEYS, SORT_KEYS } from '../lib/fileUtils.js';
@@ -25,6 +26,7 @@ export default function CommandBar({
   onRename,
   onDelete,
   onOpenMany,
+  moreSections,
   sort,
   onSortChange,
   groupBy,
@@ -66,6 +68,7 @@ export default function CommandBar({
         <Trash2 size={15} />
         <span className="cmd-text">Delete</span>
       </button>
+      <Dropdown icon={<MoreHorizontal size={15} />} label="More" title="More actions" sections={moreSections || []} />
       {selectionCount > 1 && (
         <button className="cmd-btn accent" onClick={onOpenMany}>
           <ExternalLink size={15} />

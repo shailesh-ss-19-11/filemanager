@@ -9,12 +9,21 @@
   "scripts": {
     "dev": "concurrently -k -n vite,electron -c cyan,magenta \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "vite build",
+    "build:mtp": "node scripts/build-mtp.js",
     "start": "npm run build && electron .",
-    "dist:mac": "npm run build && electron-builder --mac dmg zip",
-    "dist:win": "npm run build && electron-builder --win nsis portable"
+    "dist:mac": "npm run build:mtp && npm run build && electron-builder --mac dmg zip",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "test": "node --test --test-concurrency=1 --test-timeout=240000 test/transfer.test.js test/fileops.test.js test/mtp.test.js test/preview.test.js && vitest run",
+    "test:e2e": "node --test --test-concurrency=1 --test-timeout=240000 test/e2e.test.js test/e2e-phone.test.js",
+    "test:unit": "vitest run",
+    "build:icons": "node scripts/make-icons.js"
   },
   "dependencies": {
+    "basic-ftp": "^6.2.2",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.2",
     "lucide-react": "^0.460.0",
+    "mammoth": "^1.13.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -24,20 +33,42 @@
     "cross-env": "^7.0.3",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "ftp-srv": "^4.6.3",
+    "playwright": "^1.64.0",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.5",
     "vite": "^5.4.11",
+    "vitest": "^2.1.9",
     "wait-on": "^8.0.1"
   },
   "build": {
     "appId": "com.example.filemanager",
     "productName": "File Manager",
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "directories": {
+      "output": "release"
+    },
+    "asarUnpack": [
+      "electron/native/**"
+    ],
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.utilities",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "nsis": {
       "oneClick": false,

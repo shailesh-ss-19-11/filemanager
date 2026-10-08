@@ -346,6 +346,19 @@ export function groupEntries(entries, groupBy, dateField = 'mtime', sortDir = 'a
 /* ------------------------------------------------------------------ */
 
 export const isWindowsPath = (p) => /^[A-Za-z]:[\\/]?/.test(p) || p.startsWith('\\\\');
+export const isArchiveName = (n) => /\.(zip|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz)$/i.test(n);
+export const isRemotePath = (p) => typeof p === 'string' && /^(ftp|mtp):\/\//.test(p);
+/** Display names for remote connections, keyed by connection id (set by the app). */
+export const remoteNames = {};
+/** `ftp://id/a/b` -> { root: 'ftp://id', segs: ['a','b'] } */
+function remoteParts(p) {
+  const scheme = p.slice(0, 3);
+  const rest = p.slice(6);
+  const i = rest.indexOf('/');
+  const id = i < 0 ? rest : rest.slice(0, i);
+  const segs = (i < 0 ? '' : rest.slice(i)).split('/').filter(Boolean);
+  return { id, root: `${scheme}://${id}`, segs };
+}
 export const sepFor = (p) => (isWindowsPath(p) ? '\\' : '/');
 
 export function joinPath(dir, name) {
@@ -354,6 +367,10 @@ export function joinPath(dir, name) {
 }
 
 export function dirname(p) {
+  if (isRemotePath(p)) {
+    const { root, segs } = remoteParts(p);
+    return segs.length <= 1 ? root + '/' : root + '/' + segs.slice(0, -1).join('/');
+  }
   const sep = sepFor(p);
   const trimmed = p.length > 1 && p.endsWith(sep) ? p.slice(0, -1) : p;
   const i = trimmed.lastIndexOf(sep);
@@ -365,6 +382,10 @@ export function dirname(p) {
 }
 
 export function basename(p) {
+  if (isRemotePath(p)) {
+    const { id, segs } = remoteParts(p);
+    return segs.length ? segs[segs.length - 1] : remoteNames[id] || id;
+  }
   const sep = sepFor(p);
   const trimmed = p.length > 1 && p.endsWith(sep) ? p.slice(0, -1) : p;
   const i = trimmed.lastIndexOf(sep);
@@ -376,6 +397,7 @@ export function parentPath(p) {
 }
 
 export function isRootPath(p) {
+  if (isRemotePath(p)) return remoteParts(p).segs.length === 0;
   return dirname(p) === p;
 }
 
@@ -395,6 +417,16 @@ export function pathIsInside(child, parent) {
 /** Breadcrumb parts: [{ name, path }] from the root down. */
 export function splitPath(p) {
   if (!p) return [];
+  if (isRemotePath(p)) {
+    const { id, root, segs } = remoteParts(p);
+    const out = [{ name: remoteNames[id] || 'Phone', path: root + '/' }];
+    let acc = root;
+    for (const sg of segs) {
+      acc += '/' + sg;
+      out.push({ name: sg, path: acc });
+    }
+    return out;
+  }
   if (isWindowsPath(p)) {
     if (p.startsWith('\\\\')) {
       const segs = p.split('\\').filter(Boolean);
@@ -440,12 +472,14 @@ export function splitNameExt(entry) {
 
 export function formatSize(bytes) {
   if (bytes == null) return '';
-  if (bytes < KB) return `${bytes} B`;
+  // macOS (Finder, System Settings) reports sizes in powers of 1000; Windows uses 1024.
+  const base = isMac ? 1000 : KB;
+  if (bytes < base) return `${bytes} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
-  let v = bytes / KB;
+  let v = bytes / base;
   let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
+  while (v >= base && i < units.length - 1) {
+    v /= base;
     i++;
   }
   return `${v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)} ${units[i]}`;

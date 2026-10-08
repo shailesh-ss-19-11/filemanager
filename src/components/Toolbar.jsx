@@ -11,6 +11,7 @@ export default function Toolbar({
   onForward,
   onUp,
   onRefresh,
+  refreshing,
   onNavigate,
   query,
   onQueryChange,
@@ -18,6 +19,7 @@ export default function Toolbar({
   onToggleRecursive,
   addressTick,
   findTick,
+  dnd,
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(path);
@@ -79,7 +81,7 @@ export default function Toolbar({
         <button className="icon-btn" onClick={onUp} disabled={!canUp} aria-label="Up one level" title="Up">
           <ArrowUp size={16} />
         </button>
-        <button className="icon-btn" onClick={onRefresh} aria-label="Refresh" title="Refresh">
+        <button className={`icon-btn${refreshing ? ' spinning' : ''}`} onClick={onRefresh} aria-label="Refresh" title={`Refresh (${/Mac/.test(navigator.platform) ? '⌘R' : 'Ctrl+R'} or F5)`}>
           <RotateCw size={15} />
         </button>
       </div>
@@ -106,7 +108,10 @@ export default function Toolbar({
               <span key={p.path} className="crumb-wrap">
                 {i > 0 && <ChevronRight size={12} className="crumb-sep" />}
                 <button
-                  className="crumb"
+                  className={`crumb${dnd && dnd.dropPath === p.path ? ' drop-target' : ''}`}
+                  onDragOver={dnd ? (e) => dnd.over(p.path, e) : undefined}
+                  onDragLeave={dnd ? (e) => dnd.leave(p.path, e) : undefined}
+                  onDrop={dnd ? (e) => dnd.drop(p.path, e) : undefined}
                   onClick={(e) => {
                     e.stopPropagation();
                     onNavigate(p.path);

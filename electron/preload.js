@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const subscribe = (channel, cb) => {
   const handler = (_e, payload) => cb(payload);
@@ -8,14 +8,24 @@ const subscribe = (channel, cb) => {
 
 contextBridge.exposeInMainWorld('fsApi', {
   platform: process.platform,
+  pathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return '';
+    }
+  },
 
   // Reading
-  listDir: (dir) => ipcRenderer.invoke('fs:list', dir),
+  listDir: (dir, fresh) => ipcRenderer.invoke('fs:list', dir, fresh),
   quickAccess: () => ipcRenderer.invoke('fs:quickAccess'),
-  drives: () => ipcRenderer.invoke('fs:drives'),
+  drives: (fresh) => ipcRenderer.invoke('fs:drives', fresh),
   onDrivesChanged: (cb) => subscribe('drives:changed', cb),
   search: (opts) => ipcRenderer.invoke('fs:search', opts),
   cancelSearch: (id) => ipcRenderer.send('fs:cancelSearch', id),
+  diskSpace: (p) => ipcRenderer.invoke('fs:diskSpace', p),
+  cacheScan: () => ipcRenderer.invoke('fs:cacheScan'),
+  cleanScan: (root) => ipcRenderer.invoke('fs:cleanScan', root),
   folderSize: (dir) => ipcRenderer.invoke('fs:folderSize', dir),
   thumbnail: (opts) => ipcRenderer.invoke('fs:thumbnail', opts),
 
@@ -25,7 +35,7 @@ contextBridge.exposeInMainWorld('fsApi', {
   onChanged: (cb) => subscribe('fs:changed', cb),
 
   // Shell
-  open: (paths) => ipcRenderer.invoke('shell:open', paths),
+  open: (paths, meta) => ipcRenderer.invoke('shell:open', paths, meta),
   showInFolder: (p) => ipcRenderer.send('shell:showInFolder', p),
   openFolder: (p) => ipcRenderer.invoke('shell:openFolder', p),
   newWindow: (p) => ipcRenderer.send('window:new', p),
@@ -35,8 +45,33 @@ contextBridge.exposeInMainWorld('fsApi', {
   // Mutations
   newFolder: (dir) => ipcRenderer.invoke('fs:newFolder', dir),
   rename: (p, newName) => ipcRenderer.invoke('fs:rename', { path: p, newName }),
-  trash: (paths) => ipcRenderer.invoke('fs:trash', paths),
-  paste: (items, dest, mode) => ipcRenderer.invoke('fs:paste', { items, dest, mode }),
+  trash: (paths, id) => ipcRenderer.invoke('fs:trash', paths, id),
+  paste: (items, dest, mode, opts = {}) => ipcRenderer.invoke('fs:paste', { items, dest, mode, ...opts }),
+  pasteConflicts: (items, dest) => ipcRenderer.invoke('fs:pasteConflicts', { items, dest }),
+  cancelTransfer: (id) => ipcRenderer.send('transfer:cancel', id),
+  onTransfer: (cb) => subscribe('transfer:progress', cb),
+
+  // Explorer-style operations
+  compress: (paths, id) => ipcRenderer.invoke('fs:compress', paths, id),
+  extract: (p, id) => ipcRenderer.invoke('fs:extract', p, id),
+  setHidden: (paths, hidden) => ipcRenderer.invoke('fs:setHidden', paths, hidden),
+  setReadOnly: (paths, ro) => ipcRenderer.invoke('fs:setReadOnly', paths, ro),
+  properties: (p) => ipcRenderer.invoke('fs:properties', p),
+  newFile: (dir) => ipcRenderer.invoke('fs:newFile', dir),
+  deletePermanent: (paths, id) => ipcRenderer.invoke('fs:deletePermanent', paths, id),
+  chooseFolder: (title) => ipcRenderer.invoke('dialog:chooseFolder', title),
+  openWith: (paths) => ipcRenderer.invoke('shell:openWith', paths),
+
+  previewSource: (p, meta) => ipcRenderer.invoke('preview:source', p, meta),
+
+  // Phone over USB (MTP)
+  mtpDevice: () => ipcRenderer.invoke('mtp:device'),
+  onMtpChanged: (cb) => subscribe('mtp:changed', cb),
+
+  // FTP (phone over Wi-Fi)
+  ftpList: () => ipcRenderer.invoke('ftp:list'),
+  ftpAdd: (cfg) => ipcRenderer.invoke('ftp:add', cfg),
+  ftpRemove: (id) => ipcRenderer.invoke('ftp:remove', id),
 
   // Native menu
   onCommand: (cb) => subscribe('menu:command', cb),

@@ -5,6 +5,11 @@ import { formatDate, formatSize, getKind, splitNameExt, typeLabel, dirname } fro
 
 /* ---------------------------- inline rename ---------------------------- */
 
+const shownName = (entry, showExt) =>
+  showExt || entry.isDir || !entry.extension || !entry.name.toLowerCase().endsWith('.' + entry.extension)
+    ? entry.name
+    : entry.name.slice(0, -(entry.extension.length + 1));
+
 function RenameInput({ entry, onCommit, onCancel }) {
   const ref = useRef(null);
   const done = useRef(false);
@@ -92,7 +97,18 @@ function Thumb({ entry, kind }) {
 
 /* --------------------------------- rows -------------------------------- */
 
+const dropProps = (entry, dnd, renaming) => ({
+  draggable: !renaming,
+  onDragStart: (e) => dnd.start(entry, e),
+  onDragOver: entry.isDir ? (e) => dnd.over(entry.path, e) : undefined,
+  onDragLeave: entry.isDir ? (e) => dnd.leave(entry.path, e) : undefined,
+  onDrop: entry.isDir ? (e) => dnd.drop(entry.path, e) : undefined,
+});
+
 const Row = memo(function Row({
+  showExt,
+  dnd,
+  dropTarget,
   entry,
   selected,
   focused,
@@ -110,7 +126,8 @@ const Row = memo(function Row({
     <div
       className={`row${selected ? ' selected' : ''}${focused ? ' focused' : ''}${cut ? ' cut' : ''}${
         entry.hidden ? ' hidden-item' : ''
-      }`}
+      }${dropTarget ? ' drop-target' : ''}`}
+      {...dropProps(entry, dnd, renaming)}
       role="row"
       aria-selected={selected}
       data-path={entry.path}
@@ -124,7 +141,7 @@ const Row = memo(function Row({
           <RenameInput entry={entry} onCommit={onRenameCommit} onCancel={onRenameCancel} />
         ) : (
           <span className="name-text" title={entry.name}>
-            {entry.name}
+            {shownName(entry, showExt)}
           </span>
         )}
       </div>
@@ -146,13 +163,14 @@ const Row = memo(function Row({
   );
 });
 
-const Tile = memo(function Tile({ entry, selected, focused, cut, renaming, onSelect, onOpen, onContext, onRenameCommit, onRenameCancel }) {
+const Tile = memo(function Tile({ showExt, dnd, dropTarget, entry, selected, focused, cut, renaming, onSelect, onOpen, onContext, onRenameCommit, onRenameCancel }) {
   const kind = getKind(entry);
   return (
     <div
       className={`tile${selected ? ' selected' : ''}${focused ? ' focused' : ''}${cut ? ' cut' : ''}${
         entry.hidden ? ' hidden-item' : ''
-      }`}
+      }${dropTarget ? ' drop-target' : ''}`}
+      {...dropProps(entry, dnd, renaming)}
       role="option"
       aria-selected={selected}
       data-path={entry.path}
@@ -171,7 +189,7 @@ const Tile = memo(function Tile({ entry, selected, focused, cut, renaming, onSel
       {renaming ? (
         <RenameInput entry={entry} onCommit={onRenameCommit} onCancel={onRenameCancel} />
       ) : (
-        <span className="tile-name">{entry.name}</span>
+        <span className="tile-name">{shownName(entry, showExt)}</span>
       )}
     </div>
   );
@@ -238,6 +256,8 @@ export default function FileView({
   onRenameCancel,
   onColsChange,
   emptyState,
+  dnd,
+  showExt = true,
 }) {
   const scrollRef = useRef(null);
 
@@ -273,6 +293,9 @@ export default function FileView({
     focused: focusPath === entry.path,
     cut: cutSet.has(entry.path),
     renaming: renamingPath === entry.path,
+    showExt,
+    dnd,
+    dropTarget: dnd.dropPath === entry.path,
     onSelect,
     onOpen,
     onContext,
@@ -299,8 +322,11 @@ export default function FileView({
 
   return (
     <div
-      className={`fileview ${view}${showFolder ? ' with-folder' : ''}`}
+      className={`fileview ${view}${showFolder ? ' with-folder' : ''}${dnd.dropPath === '' ? ' drop-here' : ''}`}
       ref={scrollRef}
+      onDragOver={(e) => dnd.over('', e)}
+      onDragLeave={(e) => dnd.leave('', e)}
+      onDrop={(e) => dnd.drop('', e)}
       onClick={bgClick}
       onContextMenu={(e) => {
         if (e.target === e.currentTarget || e.target.classList.contains('group-body') || e.target.closest('.empty')) {
