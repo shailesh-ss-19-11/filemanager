@@ -1,5 +1,25 @@
 # File Manager
 
+[![Latest release](https://img.shields.io/github/v/release/shailesh-ss-19-11/filemanager?label=download&color=2f78d0)](https://github.com/shailesh-ss-19-11/filemanager/releases/latest)
+
+A desktop file manager (Electron + React) with strong filtering and sorting, Windows-Explorer-style
+file operations, free/used space, a clean-up tool, previews, and Android phone support over USB or Wi-Fi.
+
+## Download
+
+| Platform | Download |
+|---|---|
+| **macOS (Apple silicon)** | [**File-Manager-arm64.dmg**](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-arm64.dmg) · [zip](https://github.com/shailesh-ss-19-11/filemanager/releases/latest/download/File-Manager-arm64.zip) |
+| All versions | [Releases page](https://github.com/shailesh-ss-19-11/filemanager/releases) |
+
+**Install (macOS):** open the DMG and drag *File Manager* into *Applications*.
+The app is not signed yet, so the first time: right-click it → **Open** → **Open**
+(or run `xattr -dr com.apple.quarantine "/Applications/File Manager.app"`).
+
+**Phone over USB** needs libmtp once: `brew install libmtp`. Then plug the phone in, unlock it and choose *File transfer*.
+
+---
+
 A cross-platform desktop file manager for macOS and Windows built with **Electron**, **React 18** and **Vite**. It aims to feel like Windows File Explorer / macOS Finder, with strong filtering and sorting. Plain CSS, `lucide-react` icons, no UI framework.
 
 ## Setup
@@ -81,3 +101,16 @@ src/
 npm test            # unit + engine tests (FTP server is started locally; phone tests skip without a phone)
 npm run test:e2e    # drives the real app with Playwright (phone UI test skips without a phone)
 ```
+
+## Publishing a release (maintainers)
+
+Downloads are served from GitHub Releases. To build the app and publish it:
+
+```bash
+brew install libmtp      # once, so the phone helper can be built
+gh auth login            # once
+npm run release          # builds the .dmg/.zip and uploads them to release v<version>
+```
+
+Bump `version` in `package.json` first for a new release; running it again for the same version replaces the files.
+The files are named `File-Manager-arm64.dmg` / `.zip`, so the "latest" links above always work.

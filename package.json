@@ -16,7 +16,8 @@
     "test": "node --test --test-concurrency=1 --test-timeout=240000 test/transfer.test.js test/fileops.test.js test/mtp.test.js test/preview.test.js && vitest run",
     "test:e2e": "node --test --test-concurrency=1 --test-timeout=240000 test/e2e.test.js test/e2e-phone.test.js",
     "test:unit": "vitest run",
-    "build:icons": "node scripts/make-icons.js"
+    "build:icons": "node scripts/make-icons.js",
+    "release": "node scripts/release.js"
   },
   "dependencies": {
     "basic-ftp": "^6.2.2",
@@ -61,18 +62,30 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "artifactName": "File-Manager-${arch}.${ext}"
     },
     "win": {
       "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "artifactName": "File-Manager-Setup-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "File-Manager-Setup-${arch}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "shailesh-ss-19-11",
+      "repo": "filemanager"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shailesh-ss-19-11/filemanager.git"
   }
 }
