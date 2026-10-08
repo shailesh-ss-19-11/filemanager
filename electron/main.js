@@ -1078,7 +1078,23 @@ function buildMenu() {
 /* App lifecycle                                                       */
 /* ------------------------------------------------------------------ */
 
+// One running copy per user: a second launch (for example the installed app while a dev copy is open) would
+// otherwise fight the first one for the phone's USB connection.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    } else if (app.isReady()) createWindow();
+  });
+}
+
 app.whenReady().then(() => {
+  if (!gotLock) return;
   if (isMac && app.dock) app.dock.setIcon(nativeImage.createFromPath(ICON)); // Dock icon when run from source
   // fmfile://local/<path> serves files the renderer asked to preview (with Range support for video)
   protocol.handle('fmfile', (req) => {

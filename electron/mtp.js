@@ -10,7 +10,7 @@ const { spawn, execFile } = require('node:child_process');
 
 const PREFIX = 'mtp://phone';
 const ROOT_PARENT = 0xffffffff;
-const HELPER = path.join(__dirname, 'native', 'mtp-helper').replace('app.asar', 'app.asar.unpacked');
+const HELPER = process.env.FM_MTP_HELPER || path.join(__dirname, 'native', 'mtp-helper').replace('app.asar', 'app.asar.unpacked');
 
 const helperExists = () => fs.existsSync(HELPER);
 
@@ -125,14 +125,42 @@ const segsOf = (vpath) => vpath.slice(PREFIX.length).split('/').filter(Boolean);
 const vpathOf = (segs) => PREFIX + '/' + segs.join('/');
 const clean = (n) => String(n).replace(/[\t\r\n]/g, ' ');
 
+const STORAGE_HELP =
+  'Could not read the phone’s storage. Unlock the phone screen, pull down the notification and choose “File transfer”, then press Refresh.';
+let storagesFailed = false;
+
+/**
+ * Android only exposes storage once the screen is unlocked, and a session opened while it was locked can
+ * stay empty after unlocking. So when reading storage fails, reconnect and try again a few times.
+ */
 async function storages() {
-  const { rows } = await call('storages');
-  return rows.map(([id, name, max, free]) => ({
-    id: Number(id),
-    name: name.replace(/\//g, '-'),
-    max: Number(max),
-    free: Number(free),
-  }));
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { rows } = await call('storages');
+      storagesFailed = false;
+      return rows.map(([id, name, max, free]) => ({
+        id: Number(id),
+        name: name.replace(/\//g, '-'),
+        max: Number(max),
+        free: Number(free),
+      }));
+    } catch (err) {
+      lastErr = err;
+      if (!/storage|session|PTP|device/i.test(err.message || '')) throw err;
+      stopHelper(); // fresh session on the next call
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 400 : 1500));
+    }
+  }
+  storagesFailed = true;
+  const e = new Error(STORAGE_HELP);
+  e.cause = lastErr;
+  throw e;
+}
+
+/** Called on Refresh: if the last read of the phone's storage failed, start over with a new session. */
+function resetIfFailed() {
+  if (storagesFailed) stopHelper();
 }
 
 async function listChildren(storage, parent) {
@@ -341,6 +369,7 @@ module.exports = {
   PREFIX,
   detect,
   clearCache: () => cache.clear(),
+  resetIfFailed,
   stopHelper,
   getLabel: () => label,
   helperExists,

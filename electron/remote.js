@@ -327,7 +327,10 @@ const openCache = new Map(); // vpath -> { file, key }
 async function list(vpath, fresh = false) {
   const hit = listCache.get(vpath);
   if (!fresh && hit && Date.now() - hit.at < LIST_TTL) return hit.result;
-  if (fresh && isMtp(vpath)) mtp.clearCache(); // folders may have been replaced on the phone itself
+  if (fresh && isMtp(vpath)) {
+    mtp.resetIfFailed(); // storage failed earlier (phone was locked)? reconnect now
+    mtp.clearCache(); // folders may have been replaced on the phone itself
+  }
   const result = await driverFor(vpath).list(vpath);
   if (result.ok) listCache.set(vpath, { at: Date.now(), result });
   else listCache.delete(vpath);
