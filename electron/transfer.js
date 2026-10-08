@@ -194,8 +194,8 @@ async function run({ id, items, dest, mode, policy = 'keep', sizes = {} }, send)
 
       if (!srcRemote && !destRemote) {
         /* ---------- local -> local ---------- */
-        const isDir = (await fsp.stat(src)).isDirectory();
-        if (isDir && isInside(dest, src)) {
+        // (cheap string test first: only stat the source when dest could be inside it)
+        if (isInside(dest, src) && (await fsp.stat(src)).isDirectory()) {
           errors.push(`Can't paste "${base}" into itself.`);
           return;
         }
@@ -207,6 +207,7 @@ async function run({ id, items, dest, mode, policy = 'keep', sizes = {} }, send)
         let target = path.join(dest, base);
         if (await exists(target)) {
           if (sameDir || policy === 'keep') {
+            const isDir = (await fsp.stat(src)).isDirectory();
             const taken = await takenFor(dest);
             const name = copyName(base, taken, isDir);
             taken.add(name);

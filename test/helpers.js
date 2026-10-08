@@ -69,6 +69,6 @@ const isWin = process.platform === 'win32';
 /** Name the app gives a pasted duplicate: "f copy.txt" (macOS/Linux) or "f - Copy.txt" (Windows). */
 const copyOf = (stem, ext = '') => (isWin ? `${stem} - Copy${ext}` : `${stem} copy${ext}`);
 /** Windows CI disks are slow: scale time limits */
-const slow = (ms) => (isWin ? ms * 5 : ms);
+const slow = (ms) => (isWin ? ms * 15 : ms);
 
 module.exports = { copyOf, slow, isWin, tmp, startFtp, makeDocx, makePptx, makeXlsx, waitPhoneFree };
