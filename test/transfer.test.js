@@ -187,7 +187,7 @@ test('performance: copying 3000 small files into the same folder stays quick (no
   assert.equal(fs.readdirSync(d).length, 6000);
   assert.equal(new Set(r.pasted).size, 3000, 'every copy got its own name');
   assert.ok(ms < slow(4000), `3000 same-folder copies took ${ms} ms`);
-  assert.ok(events.length < 200, `progress events are throttled (${events.length})`);
+  assert.ok(events.length <= ms / 100 + 10, `progress events are throttled (${events.length} in ${ms} ms)`);
 });
 
 test('performance: moving and deleting thousands of items is quick and throttled', async () => {
@@ -202,13 +202,13 @@ test('performance: moving and deleting thousands of items is quick and throttled
   let r = await transfer.run({ id: 'perf2', items, dest, mode: 'cut' }, (m) => ev.push(m));
   assert.equal(r.ok, true);
   assert.ok(Date.now() - t < slow(4000), `move took ${Date.now() - t} ms`);
-  assert.ok(ev.length < 200, `move events throttled (${ev.length})`);
+  assert.ok(ev.length <= (Date.now() - t) / 100 + 10, `move events throttled (${ev.length} in ${Date.now() - t} ms)`);
   ev = [];
   t = Date.now();
   const moved = fs.readdirSync(dest).map((n) => path.join(dest, n));
   r = await transfer.deleteItems({ id: 'perf3', paths: moved, permanent: true }, (m) => ev.push(m));
   assert.equal(r.deleted, 5000);
   assert.ok(Date.now() - t < slow(4000), `delete took ${Date.now() - t} ms`);
-  assert.ok(ev.length < 200, `delete events throttled (${ev.length})`);
+  assert.ok(ev.length <= (Date.now() - t) / 100 + 10, `delete events throttled (${ev.length} in ${Date.now() - t} ms)`);
   assert.equal(fs.readdirSync(dest).length, 0);
 });
