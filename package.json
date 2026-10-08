@@ -1,7 +1,7 @@
 {
   "name": "filemanager",
   "productName": "File Manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A cross-platform desktop file manager with strong filtering and sorting",
   "main": "electron/main.js",
   "author": {
