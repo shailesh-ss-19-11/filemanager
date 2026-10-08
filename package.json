@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "A cross-platform desktop file manager with strong filtering and sorting",
   "main": "electron/main.js",
-  "author": "File Manager",
+  "author": {
+    "name": "Shailesh",
+    "email": "shailesh-ss-19-11@users.noreply.github.com"
+  },
   "license": "MIT",
   "scripts": {
     "dev": "concurrently -k -n vite,electron -c cyan,magenta \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
@@ -12,12 +15,13 @@
     "build:mtp": "node scripts/build-mtp.js",
     "start": "npm run build && electron .",
     "dist:mac": "npm run build:mtp && npm run build && electron-builder --mac dmg zip",
-    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:win": "npm run build && electron-builder --win nsis portable --x64",
     "test": "node --test --test-concurrency=1 --test-timeout=240000 test/transfer.test.js test/fileops.test.js test/mtp.test.js test/preview.test.js && vitest run",
     "test:e2e": "node --test --test-concurrency=1 --test-timeout=240000 test/e2e.test.js test/e2e-phone.test.js",
     "test:unit": "vitest run",
     "build:icons": "node scripts/make-icons.js",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "dist:linux": "npm run build:mtp && npm run build && electron-builder --linux AppImage deb"
   },
   "dependencies": {
     "basic-ftp": "^6.2.2",
@@ -82,10 +86,24 @@
       "provider": "github",
       "owner": "shailesh-ss-19-11",
       "repo": "filemanager"
+    },
+    "portable": {
+      "artifactName": "File-Manager-Portable-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "artifactName": "File-Manager-${arch}.${ext}",
+      "maintainer": "Shailesh <shailesh-ss-19-11@users.noreply.github.com>"
     }
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/shailesh-ss-19-11/filemanager.git"
-  }
+  },
+  "homepage": "https://github.com/shailesh-ss-19-11/filemanager"
 }

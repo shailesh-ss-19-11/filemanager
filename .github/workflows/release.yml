@@ -1,0 +1,64 @@
+name: Release
+
+# Builds the app on macOS, Windows and Linux and attaches the files to the GitHub release for the tag.
+# Run by pushing a tag (git tag v1.0.1 && git push --tags) or by hand from the Actions tab.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach the builds to (for example v1.0.0)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the release if it does not exist yet
+        run: gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "File Manager ${TAG#v}" --generate-notes
+
+  build:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+            files: "release/File-Manager-*.dmg release/File-Manager-*.zip"
+          - os: windows-latest
+            script: dist:win
+            files: "release/File-Manager-Setup-*.exe release/File-Manager-Portable-*.exe"
+          - os: ubuntu-latest
+            script: dist:linux
+            files: "release/File-Manager-*.AppImage release/File-Manager-*.deb"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Phone helper dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libmtp
+      - name: Phone helper dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libmtp-dev
+      - run: npm ci
+      - name: Build
+        run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Upload to the release
+        shell: bash
+        run: gh release upload "$TAG" ${{ matrix.files }} --clobber
