@@ -17,6 +17,11 @@ if (spawnSync('gh', ['auth', 'status'], { stdio: 'ignore' }).status !== 0) {
   process.exit(1);
 }
 
+// start from a clean output folder so old builds (with other file names) are never uploaded
+for (const f of fs.existsSync(path.join(root, 'release')) ? fs.readdirSync(path.join(root, 'release')) : []) {
+  if (/\.(dmg|zip|blockmap|yml)$/.test(f)) fs.rmSync(path.join(root, 'release', f), { force: true });
+}
+
 console.log(`\n▶ Building ${pkg.productName} ${pkg.version}…`);
 run('npm', ['run', 'dist:mac']);
 
