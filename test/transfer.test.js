@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { tmp, startFtp } = require('./helpers');
+const { tmp, startFtp, copyOf, slow } = require('./helpers');
 const remote = require('../electron/remote');
 const transfer = require('../electron/transfer');
 
@@ -44,7 +44,7 @@ test('conflicts: detected, then keep / replace / skip behave correctly', async (
   assert.equal(fs.readFileSync(path.join(dest, 'f.txt'), 'utf8'), 'old');
 
   await transfer.run({ id: 'k2', items: [item], dest, mode: 'copy', policy: 'keep' }, noop);
-  assert.deepEqual(fs.readdirSync(dest).sort(), ['f copy.txt', 'f.txt'].sort());
+  assert.deepEqual(fs.readdirSync(dest).sort(), [copyOf('f', '.txt'), 'f.txt'].sort());
   assert.equal(fs.readFileSync(path.join(dest, 'f.txt'), 'utf8'), 'old');
 
   await transfer.run({ id: 'k3', items: [item], dest, mode: 'copy', policy: 'replace' }, noop);
@@ -58,7 +58,7 @@ test('pasting a folder into itself is refused; same-folder copy makes "copy"', a
   assert.equal(r.ok, false);
   assert.match(r.errors[0], /into itself/);
   await transfer.run({ id: 's2', items: [path.join(d, 'sub')], dest: d, mode: 'copy' }, noop);
-  assert.ok(fs.existsSync(path.join(d, 'sub copy/x.txt')));
+  assert.ok(fs.existsSync(path.join(d, copyOf('sub'), 'x.txt')));
 });
 
 test('cancel stops a running copy and removes the partial file', async () => {
@@ -99,7 +99,7 @@ test('FTP: upload, download, conflicts, move, delete (against a local FTP server
     r = await transfer.run({ id: 'f2', items: [path.join(local, 'up.txt'), path.join(local, 'remote.txt')], dest: base, mode: 'copy', policy: 'keep' }, noop);
     assert.equal(r.ok, true, r.errors.join());
     assert.equal(fs.readFileSync(path.join(root, 'up.txt'), 'utf8'), 'uploaded');
-    assert.ok(fs.existsSync(path.join(root, 'remote copy.txt')));
+    assert.ok(fs.existsSync(path.join(root, copyOf('remote', '.txt'))));
 
     // remote -> remote move into a folder, then delete
     r = await transfer.run({ id: 'f3', items: [base + 'up.txt'], dest: base + 'folder', mode: 'cut' }, noop);
@@ -186,7 +186,7 @@ test('performance: copying 3000 small files into the same folder stays quick (no
   assert.equal(r.ok, true, r.errors.join());
   assert.equal(fs.readdirSync(d).length, 6000);
   assert.equal(new Set(r.pasted).size, 3000, 'every copy got its own name');
-  assert.ok(ms < 4000, `3000 same-folder copies took ${ms} ms`);
+  assert.ok(ms < slow(4000), `3000 same-folder copies took ${ms} ms`);
   assert.ok(events.length < 200, `progress events are throttled (${events.length})`);
 });
 
@@ -201,14 +201,14 @@ test('performance: moving and deleting thousands of items is quick and throttled
   let t = Date.now();
   let r = await transfer.run({ id: 'perf2', items, dest, mode: 'cut' }, (m) => ev.push(m));
   assert.equal(r.ok, true);
-  assert.ok(Date.now() - t < 4000, `move took ${Date.now() - t} ms`);
+  assert.ok(Date.now() - t < slow(4000), `move took ${Date.now() - t} ms`);
   assert.ok(ev.length < 200, `move events throttled (${ev.length})`);
   ev = [];
   t = Date.now();
   const moved = fs.readdirSync(dest).map((n) => path.join(dest, n));
   r = await transfer.deleteItems({ id: 'perf3', paths: moved, permanent: true }, (m) => ev.push(m));
   assert.equal(r.deleted, 5000);
-  assert.ok(Date.now() - t < 4000, `delete took ${Date.now() - t} ms`);
+  assert.ok(Date.now() - t < slow(4000), `delete took ${Date.now() - t} ms`);
   assert.ok(ev.length < 200, `delete events throttled (${ev.length})`);
   assert.equal(fs.readdirSync(dest).length, 0);
 });

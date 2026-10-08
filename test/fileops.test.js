@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { tmp } = require('./helpers');
+const { tmp, isWin } = require('./helpers');
 const ops = require('../electron/fileops');
 
 const write = (p, c = 'x') => (fs.mkdirSync(path.dirname(p), { recursive: true }), fs.writeFileSync(p, c));
@@ -22,7 +22,7 @@ test('compress a folder + file into Archive.zip, then extract it', async () => {
   const zip2 = await ops.compress([path.join(d, 'b.txt')]);
   assert.equal(path.basename(zip2), 'b.zip');
   const again = await ops.compress([path.join(d, 'b.txt')]);
-  assert.equal(path.basename(again), 'b 2.zip');
+  assert.equal(path.basename(again), isWin ? 'b (2).zip' : 'b 2.zip');
 });
 
 test('hide / unhide sets and clears the OS hidden attribute', async () => {

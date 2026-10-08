@@ -65,4 +65,10 @@ async function waitPhoneFree(ms = 15000) {
   }
 }
 
-module.exports = { tmp, startFtp, makeDocx, makePptx, makeXlsx, waitPhoneFree };
+const isWin = process.platform === 'win32';
+/** Name the app gives a pasted duplicate: "f copy.txt" (macOS/Linux) or "f - Copy.txt" (Windows). */
+const copyOf = (stem, ext = '') => (isWin ? `${stem} - Copy${ext}` : `${stem} copy${ext}`);
+/** Windows CI disks are slow: scale time limits */
+const slow = (ms) => (isWin ? ms * 5 : ms);
+
+module.exports = { copyOf, slow, isWin, tmp, startFtp, makeDocx, makePptx, makeXlsx, waitPhoneFree };
