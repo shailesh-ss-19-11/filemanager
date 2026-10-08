@@ -916,6 +916,27 @@ h4 {
   color: var(--accent);
 }
 
+/* ---------- Credit ---------- */
+.credit {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  user-select: text;
+}
+.credit a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.credit a:hover {
+  text-decoration: underline;
+}
+
 /* ---------- Context menu ---------- */
 .context-menu {
   position: fixed;

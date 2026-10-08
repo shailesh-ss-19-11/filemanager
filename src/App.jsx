@@ -1054,6 +1054,11 @@ export default function App() {
         )}
       </footer>
 
+      <div className="credit">
+        Maintained and developed by Shailesh Gokhale ·{' '}
+        <a href="mailto:gokhaleshail@gmail.com">gokhaleshail@gmail.com</a>
+      </div>
+
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={menuItems()} onClose={() => setCtx(null)} />}
 
       {previewPath && (

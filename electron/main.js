@@ -239,6 +239,11 @@ function createWindow(startPath) {
   // Never let the renderer navigate away or spawn windows by itself.
   contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   contents.on('will-navigate', (e, url) => {
+    if (url === 'mailto:gokhaleshail@gmail.com') {
+      e.preventDefault();
+      shell.openExternal(url);
+      return;
+    }
     if (!DEV_URL || !url.startsWith(DEV_URL)) e.preventDefault();
   });
 
