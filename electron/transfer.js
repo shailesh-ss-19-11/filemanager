@@ -133,8 +133,10 @@ async function copyTree(src, dest, ctl, onBytes) {
 
 /* ---------------------------------- main entry ---------------------------------- */
 
-async function run({ id, items, dest, mode, policy = 'keep', sizes = {} }, send) {
-  const ctl = { cancelled: false };
+async function run({ id, items, dest, mode, policy = 'keep', sizes = {}, resume = false, targets = {} }, send) {
+  const ctl = { cancelled: false, interrupted: false };
+  const usedTargets = {}; // phone item -> local copy, so a resume carries on into the same place
+  const unfinished = new Set();
   active.set(id, ctl);
   remote.invalidate();
   const errors = [];
@@ -242,21 +244,33 @@ async function run({ id, items, dest, mode, policy = 'keep', sizes = {} }, send)
       } else if (srcRemote && !destRemote) {
         /* ---------- remote -> local ---------- */
         const sd = remote.driverFor(src);
-        const isDir = await sd.isDir(src);
-        let target = path.join(dest, base);
-        if (await exists(target)) {
-          if (policy === 'skip') return;
-          if (policy === 'replace') await fsp.rm(target, { recursive: true, force: true });
-          else {
-            const taken = await takenFor(dest);
-            const name = copyName(base, taken, isDir);
-            taken.add(name);
-            target = path.join(dest, name);
-          }
-        }
+        const resuming = resume && !!targets[src];
+        let target = resuming ? targets[src] : path.join(dest, base);
         try {
-          await sd.download(src, target, onBytes);
+          if (!resuming) {
+            const isDir = await sd.isDir(src);
+            if (await exists(target)) {
+              if (policy === 'skip') return;
+              if (policy === 'replace') await fsp.rm(target, { recursive: true, force: true });
+              else {
+                const taken = await takenFor(dest);
+                const name = copyName(base, taken, isDir);
+                taken.add(name);
+                target = path.join(dest, name);
+              }
+            }
+          }
+          usedTargets[src] = target;
+          await sd.download(src, target, onBytes, { resume: resuming });
         } catch (err) {
+          if (sd.isInterruption && sd.isInterruption(err) && !ctl.cancelled) {
+            // phone unplugged / locked: keep what arrived so far so it can be resumed
+            ctl.interrupted = true;
+            unfinished.add(i);
+            if (sd.reset) sd.reset();
+            errors.push(`${base}: ${(err && err.message) || 'The phone was disconnected.'}`);
+            return;
+          }
           await fsp.rm(target, { recursive: true, force: true }).catch(() => {});
           throw err;
         }
@@ -296,7 +310,7 @@ async function run({ id, items, dest, mode, policy = 'keep', sizes = {} }, send)
   const allLocal = !remote.isRemote(dest) && !list.some((p) => remote.isRemote(p));
   let next = 0;
   const worker = async () => {
-    while (next < list.length && !ctl.cancelled) await processOne(next++);
+    while (next < list.length && !ctl.cancelled && !ctl.interrupted) await processOne(next++);
   };
   emit(true);
   await Promise.all(Array.from({ length: allLocal ? Math.min(8, list.length) : 1 }, worker));
@@ -306,6 +320,17 @@ async function run({ id, items, dest, mode, policy = 'keep', sizes = {} }, send)
     active.delete(id);
     remote.invalidate();
     return { ok: false, cancelled: true, pasted, errors };
+  }
+
+  if (ctl.interrupted) {
+    // everything from the interrupted item onward still has to be copied
+    const first = Math.min(...unfinished);
+    const rest = list.slice(first);
+    const resumeInfo = { items: rest, dest, mode, policy, targets: usedTargets, done, total };
+    send({ id, state: 'interrupted', done, total, resume: resumeInfo });
+    active.delete(id);
+    remote.invalidate();
+    return { ok: false, interrupted: true, pasted, errors, resume: resumeInfo };
   }
 
   active.delete(id);
@@ -456,6 +481,13 @@ function extractRemote({ id, path: vp }, send) {
   });
 }
 
+/** Throw away the half-copied files of an interrupted transfer. */
+async function discard(targets) {
+  for (const t of Object.values(targets || {})) {
+    if (typeof t === 'string' && t) await fsp.rm(t, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 function cancel(id) {
   const ctl = active.get(id);
   if (!ctl) return;
@@ -463,4 +495,4 @@ function cancel(id) {
   remote.cancelAll(); // interrupts a phone/FTP transfer that is mid-file
 }
 
-module.exports = { run, cancel, conflicts, compressRemote, extractRemote, deleteItems };
+module.exports = { run, cancel, discard, conflicts, compressRemote, extractRemote, deleteItems };

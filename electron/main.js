@@ -21,6 +21,7 @@ const mtp = require('./mtp');
 const transfer = require('./transfer');
 const fileops = require('./fileops');
 const preview = require('./preview');
+const editors = require('./editors');
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'fmfile', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true } },
@@ -525,6 +526,12 @@ function registerIpc() {
     }
     return { ok: errors.length === 0, error: errors[0] };
   });
+  ipcMain.handle('shell:editors', () => editors.list());
+  ipcMain.handle('shell:openInEditor', (_e, id, paths) => {
+    const list = (Array.isArray(paths) ? paths : [paths]).filter((p) => str(p) && !remote.isRemote(p));
+    if (!str(id) || !list.length) return { ok: false, error: 'Nothing to open.' };
+    return editors.open(id, list);
+  });
   ipcMain.on('shell:showInFolder', (_e, p) => {
     if (str(p) && !remote.isRemote(p)) shell.showItemInFolder(p);
   });
@@ -677,14 +684,15 @@ function registerIpc() {
     }
   });
   ipcMain.handle('fs:paste', async (e, args) => {
-    const { items, dest, mode, id, policy, sizes } = args || {};
+    const { items, dest, mode, id, policy, sizes, resume, targets } = args || {};
     return transfer.run(
-      { id: id || `t${Date.now()}`, items, dest, mode, policy, sizes },
+      { id: id || `t${Date.now()}`, items, dest, mode, policy, sizes, resume: !!resume, targets: targets || {} },
       (msg) => {
         if (!e.sender.isDestroyed()) e.sender.send('transfer:progress', msg);
       }
     );
   });
+  ipcMain.handle('transfer:discard', (_e, targets) => transfer.discard(targets));
   ipcMain.on('transfer:cancel', (_e, id) => transfer.cancel(id));
 
   // macOS Finder reports "available" including purgeable space (caches, snapshots, iCloud);

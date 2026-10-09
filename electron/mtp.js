@@ -186,7 +186,7 @@ async function resolve(vpath) {
     const kids = await listChildren(node.storage, node.id);
     const hit = kids.find((k) => k.name === segs[i]);
     if (!hit) throw new Error(`“${segs[i]}” was not found on the phone.`);
-    node = { id: hit.id, storage: node.storage, isDir: hit.isDir };
+    node = { id: hit.id, storage: node.storage, isDir: hit.isDir, size: hit.size };
   }
   cache.set(vpath, node);
   return node;
@@ -323,22 +323,65 @@ async function remove(vpath, onTick = () => {}) {
   cache.clear();
 }
 
-async function download(vpath, localDest, onBytes = () => {}) {
+/** Did this failure come from the phone/cable going away (so a later resume could carry on)? */
+const isInterruption = (err) =>
+  !!err && (err.interrupted || /disconnected|open the phone|storage|copy the file from the phone|unlock/i.test(err.message || ''));
+
+const sizeOrNull = (p) => fsp.stat(p).then((s) => s.size, () => null);
+
+/**
+ * Copy a file or folder from the phone. Files arrive as `<name>.fmpart` and are renamed when complete, so a
+ * pulled cable leaves a partial file behind. With `resume`, finished files are skipped and a partial file
+ * continues from where it stopped.
+ */
+async function download(vpath, localDest, onBytes = () => {}, { resume = false } = {}) {
   const node = await resolve(vpath);
   const walk = async (n, dest) => {
     if (n.isDir) {
       await fsp.mkdir(dest, { recursive: true });
       for (const k of await listChildren(n.storage, n.id)) {
-        await walk({ id: k.id, storage: n.storage, isDir: k.isDir }, path.join(dest, k.name));
+        await walk({ id: k.id, storage: n.storage, isDir: k.isDir, size: k.size }, path.join(dest, k.name));
       }
-    } else {
-      let last = 0;
-      await call('get', n.id, dest, (sent) => {
-        onBytes(sent - last);
-        last = sent;
-      });
-      if (last === 0) onBytes((await fsp.stat(dest)).size);
+      return;
     }
+    const part = dest + '.fmpart';
+    let have = 0;
+    if (resume) {
+      if ((await sizeOrNull(dest)) === n.size) return onBytes(n.size); // finished before the interruption
+      const p = await sizeOrNull(part);
+      if (p && p < n.size) have = p;
+    }
+    if (!have) await fsp.rm(part, { force: true });
+    let last = have;
+    if (have) onBytes(have);
+    const progress = (sent) => {
+      onBytes(sent - last);
+      last = sent;
+    };
+    try {
+      if (have) {
+        try {
+          await call('getrange', n.id, part, have, n.size, progress);
+        } catch (err) {
+          if (isInterruption(err) && /disconnected|open the phone/i.test(err.message)) throw err;
+          // the phone can't send part of a file: start this one over
+          onBytes(-last);
+          last = 0;
+          await call('get', n.id, part, progress);
+        }
+      } else await call('get', n.id, part, progress);
+    } catch (err) {
+      if (err && typeof err === 'object') err.interrupted = true;
+      throw err;
+    }
+    const got = await sizeOrNull(part);
+    if (n.size != null && got !== n.size) {
+      const e = new Error('The file from the phone is incomplete.');
+      e.interrupted = true;
+      throw e;
+    }
+    if (last === 0) onBytes(got ?? 0);
+    await fsp.rename(part, dest);
   };
   await walk(node, localDest);
 }
@@ -375,5 +418,5 @@ module.exports = {
   helperExists,
   space,
   thumbnail,
-  driver: { list, isDir, names, mkdir, rename, remove, download, upload, baseName },
+  driver: { list, isDir, names, mkdir, rename, remove, download, upload, baseName, isInterruption, reset: stopHelper },
 };

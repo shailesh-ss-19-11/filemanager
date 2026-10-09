@@ -39,6 +39,24 @@ test('lists the folder and shows disk space in the status bar', async () => {
   await page.waitForFunction(() => /free of .* used/.test(document.querySelector('.statusbar')?.innerText || ''), null, { timeout: 15000 });
 });
 
+test('file menu has an "Open with" submenu; folder menu offers installed editors', async () => {
+  const editors = await page.evaluate(() => window.fsApi.editors());
+  await row('notes.txt').click({ button: 'right' });
+  await page.locator('.context-menu .cm-sub-wrap', { hasText: 'Open with' }).hover();
+  const sub = page.locator('.cm-submenu');
+  await sub.waitFor();
+  assert.ok(await sub.locator('.cm-item', { hasText: 'Choose another app' }).count());
+  for (const ed of editors) assert.ok(await sub.locator('.cm-item', { hasText: ed.name }).count(), ed.name);
+  await page.mouse.click(5, 5);
+  await page.locator('.context-menu').waitFor({ state: 'detached' });
+
+  await row('sub').click({ button: 'right' });
+  const items = await page.locator('.context-menu > .cm-item').allInnerTexts();
+  for (const ed of editors) assert.ok(items.some((t) => t.includes(`Open folder in ${ed.name}`)), ed.name);
+  await page.mouse.click(5, 5);
+  await page.locator('.context-menu').waitFor({ state: 'detached' });
+});
+
 test('sidebar shows drives with a usage bar', async () => {
   await page.waitForSelector('.drive-bar', { timeout: 15000 });
   assert.match(await page.locator('.drive-text').first().innerText(), /free of/);

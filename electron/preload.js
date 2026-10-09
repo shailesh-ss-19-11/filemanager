@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('fsApi', {
 
   // Shell
   open: (paths, meta) => ipcRenderer.invoke('shell:open', paths, meta),
+  editors: () => ipcRenderer.invoke('shell:editors'),
+  openInEditor: (id, paths) => ipcRenderer.invoke('shell:openInEditor', id, paths),
   showInFolder: (p) => ipcRenderer.send('shell:showInFolder', p),
   openFolder: (p) => ipcRenderer.invoke('shell:openFolder', p),
   newWindow: (p) => ipcRenderer.send('window:new', p),
@@ -48,6 +50,7 @@ contextBridge.exposeInMainWorld('fsApi', {
   trash: (paths, id) => ipcRenderer.invoke('fs:trash', paths, id),
   paste: (items, dest, mode, opts = {}) => ipcRenderer.invoke('fs:paste', { items, dest, mode, ...opts }),
   pasteConflicts: (items, dest) => ipcRenderer.invoke('fs:pasteConflicts', { items, dest }),
+  discardTransfer: (targets) => ipcRenderer.invoke('transfer:discard', targets),
   cancelTransfer: (id) => ipcRenderer.send('transfer:cancel', id),
   onTransfer: (cb) => subscribe('transfer:progress', cb),
 

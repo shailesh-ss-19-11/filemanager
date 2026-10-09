@@ -432,12 +432,19 @@ export default function App() {
     if (mode === 'cut' && !samePath(dest, path) && items.every((p) => samePath(dirname(p), path))) dir.removeEntries(items);
     transferStore.add({ id, mode, current: '', done: 0, total: 0, items: items.length, elapsed: 0 });
     const r = await api.paste(items, dest, mode, { id, policy, sizes });
-    transferStore.remove(id);
-    r.errors.forEach((m) => toast(m));
+    return finishTransfer(r, id, items, dest, mode, true);
+  };
+
+  // Shared tail of a copy/move: toasts, clipboard, selection, undo. An interrupted phone copy stays in the panel to be resumed.
+  const finishTransfer = (r, id, items, dest, mode, undoable) => {
+    if (r.interrupted) transferStore.interrupt(id, r.resume, r.resume.done ?? 0, r.resume.total ?? 0);
+    else transferStore.remove(id);
+    if (r.interrupted) toast('The phone was disconnected. Reconnect it and press Resume.', 'info');
+    else r.errors.forEach((m) => toast(m));
     if (r.cancelled) toast('Cancelled.', 'info');
     if (mode === 'cut' && r.pasted.length) setClipboard(null);
     if (samePath(dest, path) && r.pasted.length) pendingRef.current = { paths: r.pasted };
-    if (r.pasted.length && !r.cancelled) {
+    if (undoable && r.pasted.length && !r.cancelled && !r.interrupted) {
       if (mode === 'copy') {
         pushUndo(`copy of ${plural(r.pasted.length, 'item')}`, () => api.trash(r.pasted));
       } else if (r.pasted.length === items.length) {
@@ -450,6 +457,23 @@ export default function App() {
     }
     refresh();
     return r;
+  };
+
+  const resumeTransfer = async (id) => {
+    const t = transferStore.get(id);
+    if (!t || !t.resume) return;
+    const rs = t.resume;
+    transferStore.restart(id);
+    const r = await api.paste(rs.items, rs.dest, rs.mode, { id, policy: rs.policy, resume: true, targets: rs.targets });
+    finishTransfer(r, id, rs.items, rs.dest, rs.mode, false);
+    refresh();
+  };
+
+  const discardTransfer = async (id) => {
+    const t = transferStore.get(id);
+    transferStore.remove(id);
+    if (t && t.resume) await api.discardTransfer(t.resume.targets);
+    refresh();
   };
 
   /* ----------------------------- drag & drop ----------------------------- */
@@ -648,6 +672,18 @@ export default function App() {
     if (!r.ok) toast(r.error);
   };
 
+  const [editors, setEditors] = useState([]);
+  useEffect(() => {
+    api.editors().then((l) => setEditors(Array.isArray(l) ? l : []), () => {});
+  }, []);
+
+  const doOpenInEditor = async (ed, list = selected) => {
+    const files = list.filter((e) => !isRemotePath(e.path));
+    if (!files.length) return toast(`Open the file first, then use “Open with ${ed.name}” on the downloaded copy.`);
+    const r = await api.openInEditor(ed.id, files.map((e) => e.path));
+    if (!r.ok) toast(r.error);
+  };
+
   const doTransferTo = async (mode, list = selected) => {
     if (!list.length) return;
     const dest = await api.chooseFolder(mode === 'cut' ? 'Move to…' : 'Copy to…');
@@ -828,7 +864,18 @@ export default function App() {
           (Array.isArray(pins) && pins.some((p) => samePath(p.path, single.path))
             ? { label: 'Unpin from sidebar', onClick: () => setPins((ps) => ps.filter((p) => !samePath(p.path, single.path))) }
             : { label: 'Pin to sidebar', onClick: () => setPins((ps) => [...(Array.isArray(ps) ? ps : []), { path: single.path, name: single.name }]) }),
-        !sel.some((e) => isRemotePath(e.path)) && { label: 'Open with…', onClick: () => doOpenWith(sel) },
+        !sel.some((e) => isRemotePath(e.path)) && {
+          label: 'Open with',
+          submenu: [
+            ...editors.map((ed) => ({ label: ed.name, onClick: () => doOpenInEditor(ed, sel) })),
+            editors.length > 0 && { separator: true },
+            { label: 'Choose another app…', onClick: () => doOpenWith(sel) },
+          ].filter(Boolean),
+        },
+        single && single.isDir && editors.length > 0 && !isRemotePath(single.path) && { separator: true },
+        ...(single && single.isDir && !isRemotePath(single.path)
+          ? editors.map((ed) => ({ label: `Open folder in ${ed.name}`, onClick: () => api.openInEditor(ed.id, [single.path]) }))
+          : []),
         { label: `Show in ${fm}`, onClick: () => api.showInFolder(sel[0].path) },
         { separator: true },
         { label: 'Cut', shortcut: mod('X'), onClick: () => doCut(sel) },
@@ -877,6 +924,7 @@ export default function App() {
       { label: 'Refresh', shortcut: 'F5', onClick: refresh },
       { separator: true },
       { label: `Open folder in ${fm}`, onClick: () => api.openFolder(path) },
+      ...(isRemotePath(path) ? [] : editors.map((ed) => ({ label: `Open folder in ${ed.name}`, onClick: () => api.openInEditor(ed.id, [path]) }))),
       { label: 'Copy folder path', onClick: () => api.copyText(path) },
       { separator: true },
       { label: 'Properties', onClick: () => showProperties([]) },
@@ -903,6 +951,7 @@ export default function App() {
         { label: 'Copy to…', disabled: !has, onSelect: () => doTransferTo('copy') },
         { label: 'Move to…', disabled: !has, onSelect: () => doTransferTo('cut') },
         { label: 'Open with…', disabled: !local, onSelect: () => doOpenWith() },
+        ...editors.map((ed) => ({ label: `Open with ${ed.name}`, disabled: !local || !has, onSelect: () => doOpenInEditor(ed) })),
       ],
       [
         { label: 'New file', onSelect: doNewFile },
@@ -1075,7 +1124,7 @@ export default function App() {
         />
       )}
       {propsFor && <PropertiesDialog entries={propsFor} onClose={() => setPropsFor(null)} onChanged={refresh} />}
-      <TransferPanel onCancel={(id) => api.cancelTransfer(id)} />
+      <TransferPanel onCancel={(id) => api.cancelTransfer(id)} onResume={resumeTransfer} onDiscard={discardTransfer} />
       {conflict && <ConflictDialog names={conflict.names} onChoose={(p) => conflict.resolve(p)} />}
       {connectOpen && (
         <ConnectDialog

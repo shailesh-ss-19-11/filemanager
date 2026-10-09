@@ -1608,3 +1608,18 @@ h4 {
 .brand img {
   border-radius: 6px;
 }
+
+.cm-sub-wrap {
+  position: relative;
+}
+.cm-submenu {
+  position: absolute;
+  left: 100%;
+  top: -5px;
+}
+
+.transfer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

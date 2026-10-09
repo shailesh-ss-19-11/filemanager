@@ -10,7 +10,7 @@ function eta(t) {
   return s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s left` : `${s} s left`;
 }
 
-export default function TransferPanel({ onCancel }) {
+export default function TransferPanel({ onCancel, onResume, onDiscard }) {
   const transfers = useTransfers();
   if (!transfers.length) return null;
   return (
@@ -20,6 +20,29 @@ export default function TransferPanel({ onCancel }) {
         // one big item (a folder) can't report a percentage: show a moving bar instead of an empty one
         const pct = t.total && !(items && t.total === 1) ? Math.min(100, (t.done / t.total) * 100) : null;
         const rate = !items && t.elapsed ? t.done / (t.elapsed / 1000) : 0;
+        if (t.interrupted) {
+          return (
+            <div className="transfer interrupted" key={t.id}>
+              <div className="transfer-top">
+                <span className="transfer-title">Copy interrupted — phone disconnected</span>
+              </div>
+              <div className="transfer-meta">
+                <span>
+                  {formatSize(t.done)}
+                  {t.total ? ` of ${formatSize(t.total)}` : ''} copied. Reconnect and unlock the phone, then resume.
+                </span>
+              </div>
+              <div className="transfer-actions">
+                <button className="btn primary" onClick={() => onResume(t.id)}>
+                  Resume
+                </button>
+                <button className="btn" onClick={() => onDiscard(t.id)}>
+                  Discard
+                </button>
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="transfer" key={t.id}>
             <div className="transfer-top">

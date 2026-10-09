@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-/** items: [{ label, shortcut, onClick, disabled }] or { separator: true } */
+/** items: [{ label, shortcut, onClick, disabled, submenu: [items] }] or { separator: true } */
 export default function ContextMenu({ x, y, items, onClose }) {
   const ref = useRef(null);
+  const [openSub, setOpenSub] = useState(-1);
   const [pos, setPos] = useState({ left: x, top: y });
 
   // Keep the menu inside the window.
@@ -50,6 +51,35 @@ export default function ContextMenu({ x, y, items, onClose }) {
       {items.map((it, i) =>
         it.separator ? (
           <div key={i} className="cm-sep" role="separator" />
+        ) : it.submenu ? (
+          <div key={i} className="cm-sub-wrap" onMouseEnter={() => setOpenSub(i)} onMouseLeave={() => setOpenSub(-1)}>
+            <button role="menuitem" aria-haspopup="menu" className="cm-item" onClick={() => setOpenSub(i)}>
+              <span className="cm-label">{it.label}</span>
+              <span className="cm-shortcut">▸</span>
+            </button>
+            {openSub === i && (
+              <div className="context-menu cm-submenu" role="menu">
+                {it.submenu.map((sub, j) =>
+                  sub.separator ? (
+                    <div key={j} className="cm-sep" role="separator" />
+                  ) : (
+                    <button
+                      key={j}
+                      role="menuitem"
+                      className="cm-item"
+                      disabled={sub.disabled}
+                      onClick={() => {
+                        onClose();
+                        sub.onClick();
+                      }}
+                    >
+                      <span className="cm-label">{sub.label}</span>
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+          </div>
         ) : (
           <button
             key={i}

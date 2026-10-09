@@ -138,6 +138,38 @@ static void do_thumb(const char *id, uint32_t item) {
   ok(id, "");
 }
 
+/* Continue a download: append bytes [offset, size) of an object to a local file (used to resume after the cable was pulled). */
+static void do_getrange(const char *id, uint32_t item, const char *path, uint64_t off, uint64_t size) {
+  FILE *fp = fopen(path, off ? "r+b" : "wb");
+  if (!fp) return err(id, "Could not write the local file.");
+  if (ftruncate(fileno(fp), (off_t)off) != 0 || fseeko(fp, (off_t)off, SEEK_SET) != 0) {
+    fclose(fp);
+    return err(id, "Could not write the local file.");
+  }
+  last_report = off;
+  while (off < size) {
+    unsigned char *data = NULL;
+    unsigned int got = 0;
+    uint64_t left = size - off;
+    uint32_t want = left < (4u << 20) ? (uint32_t)left : (4u << 20);
+    if (LIBMTP_GetPartialObject(dev, item, off, want, &data, &got) != 0 || !got) {
+      free(data);
+      fclose(fp);
+      return err(id, "Could not copy the file from the phone.");
+    }
+    if (fwrite(data, 1, got, fp) != got) {
+      free(data);
+      fclose(fp);
+      return err(id, "Could not write the local file.");
+    }
+    free(data);
+    off += got;
+    progress_cb(off, size, id);
+  }
+  fclose(fp);
+  ok(id, "");
+}
+
 static void handle(char *line) {
   char *save = NULL;
   char *id = strtok_r(line, "\t", &save);
@@ -155,6 +187,8 @@ static void handle(char *line) {
     if ((last_report = 0, LIBMTP_Get_File_To_File(dev, (uint32_t)strtoul(a, NULL, 10), b, progress_cb, id)) != 0) return err(id, "Could not copy the file from the phone.");
     return ok(id, "");
   }
+  if (!strcmp(op, "getrange") && a && b && c && d)
+    return do_getrange(id, (uint32_t)strtoul(a, NULL, 10), b, strtoull(c, NULL, 10), strtoull(d, NULL, 10));
   if (!strcmp(op, "send") && a && b && c && d) { /* storage parent localpath name */
     FILE *fp = fopen(c, "rb");
     if (!fp) return err(id, "Could not read the local file.");
